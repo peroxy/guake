@@ -157,6 +157,10 @@ class TerminalNotebook(Gtk.Notebook):
     def on_new_tab(self, user_data):
         self.new_page_with_focus()
 
+    @save_tabs_when_changed
+    def on_new_tab_with_user_shell(self, user_data):
+        self.new_page_with_focus(use_user_shell=True)
+
     def on_tab_selection(self, user_data):
         """Construct the tab selection popover
 
@@ -362,14 +366,25 @@ class TerminalNotebook(Gtk.Notebook):
     def delete_page_current(self, kill=True, prompt=0):
         self.delete_page(self.get_current_page(), kill, prompt)
 
-    def new_page(self, directory=None, position=None, empty=False, open_tab_cwd=False):
+    def new_page(
+        self,
+        directory=None,
+        position=None,
+        empty=False,
+        open_tab_cwd=False,
+        use_user_shell=False,
+    ):
         terminal_box = TerminalBox()
         if empty:
             terminal = None
         else:
-            terminal = self.terminal_spawn(directory, open_tab_cwd)
+            terminal = self.terminal_spawn(
+                directory, open_tab_cwd, use_user_shell=use_user_shell
+            )
             terminal_box.set_terminal(terminal)
-        root_terminal_box = RootTerminalBox(self.guake, self)
+        root_terminal_box = RootTerminalBox(
+            self.guake, self, use_user_shell=use_user_shell
+        )
         root_terminal_box.set_child(terminal_box)
         page_num = self.insert_page(
             root_terminal_box, None, position if position is not None else -1
@@ -401,7 +416,7 @@ class TerminalNotebook(Gtk.Notebook):
             else:
                 self.set_property("show-tabs", True)
 
-    def terminal_spawn(self, directory=None, open_tab_cwd=False):
+    def terminal_spawn(self, directory=None, open_tab_cwd=False, use_user_shell=False):
         terminal = GuakeTerminal(self.guake)
         terminal.grab_focus()
         terminal.connect(
@@ -424,7 +439,7 @@ class TerminalNotebook(Gtk.Notebook):
             except BaseException:
                 pass
         log.info("Spawning new terminal at %s", directory)
-        terminal.spawn_sync_pid(directory)
+        terminal.spawn_sync_pid(directory, use_user_shell=use_user_shell)
         return terminal
 
     def terminal_attached(self, terminal):
@@ -439,9 +454,14 @@ class TerminalNotebook(Gtk.Notebook):
         position=None,
         empty=False,
         open_tab_cwd=False,
+        use_user_shell=False,
     ):
         box, page_num, terminal = self.new_page(
-            directory, position=position, empty=empty, open_tab_cwd=open_tab_cwd
+            directory,
+            position=position,
+            empty=empty,
+            open_tab_cwd=open_tab_cwd,
+            use_user_shell=use_user_shell,
         )
         self.set_current_page(page_num)
         if not label:

@@ -88,6 +88,24 @@ __all__ = ["GuakeTerminal"]
 # pylint: enable=anomalous-backslash-in-string
 
 
+def build_shell_argv(general_settings, use_user_shell=False):
+    argv = []
+    user_shell = general_settings.get_string("default-shell")
+    if not use_user_shell and user_shell and os.path.exists(user_shell):
+        argv.append(user_shell)
+    else:
+        try:
+            argv.append(os.environ["SHELL"])
+        except KeyError:
+            argv.append("/usr/bin/bash")
+
+    login_shell = general_settings.get_boolean("use-login-shell")
+    if login_shell:
+        argv.append("--login")
+
+    return argv
+
+
 class DropTargets(IntEnum):
     URIS = 0
     TEXT = 1
@@ -555,21 +573,9 @@ class GuakeTerminal(Vte.Terminal):
         except OSError:
             pass
 
-    def spawn_sync_pid(self, directory):
+    def spawn_sync_pid(self, directory, use_user_shell=False):
 
-        argv = []
-        user_shell = self.guake.settings.general.get_string("default-shell")
-        if user_shell and os.path.exists(user_shell):
-            argv.append(user_shell)
-        else:
-            try:
-                argv.append(os.environ["SHELL"])
-            except KeyError:
-                argv.append("/usr/bin/bash")
-
-        login_shell = self.guake.settings.general.get_boolean("use-login-shell")
-        if login_shell:
-            argv.append("--login")
+        argv = build_shell_argv(self.guake.settings.general, use_user_shell=use_user_shell)
 
         log.debug('Spawn command: "%s"', " ".join(argv))
 

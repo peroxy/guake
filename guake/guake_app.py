@@ -1421,6 +1421,7 @@ class Guake(SimpleGladeApp):
                             "panes": panes,
                             "label": nb.get_tab_text_index(index),
                             "custom_label_set": getattr(page, "custom_label_set", False),
+                            "use_user_shell": getattr(page, "use_user_shell", False),
                         }
                     )
                 except FileNotFoundError:
@@ -1509,7 +1510,10 @@ class Guake(SimpleGladeApp):
                     for index, tab in enumerate(tabs):
                         if tab.get("panes", False):
                             box, page_num, term = nb.new_page_with_focus(
-                                label=tab["label"], user_set=tab["custom_label_set"], empty=True
+                                label=tab["label"],
+                                user_set=tab["custom_label_set"],
+                                empty=True,
+                                use_user_shell=tab.get("use_user_shell", False),
                             )
                             box.restore_box_layout(box.child, tab["panes"])
                         else:
@@ -1518,7 +1522,12 @@ class Guake(SimpleGladeApp):
                                 if len(tab.get("panes", [])) == 1
                                 else tab.get("directory", None)
                             )
-                            nb.new_page_with_focus(directory, tab["label"], tab["custom_label_set"])
+                            nb.new_page_with_focus(
+                                directory,
+                                tab["label"],
+                                tab["custom_label_set"],
+                                use_user_shell=tab.get("use_user_shell", False),
+                            )
 
                     # Remove original pages in notebook
                     for i in range(current_pages):

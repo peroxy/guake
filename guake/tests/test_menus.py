@@ -1,8 +1,12 @@
 # -*- coding: utf-8 -*-
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+from guake.boxes import TabLabelEventBox
 from guake.callbacks import TerminalContextMenuCallbacks
+from guake.menus import mk_notebook_context_menu
+from guake.menus import mk_tab_context_menu
 from guake.menus import mk_terminal_context_menu
 
 
@@ -115,6 +119,63 @@ def test_terminal_context_menu_contains_pane_move_items(monkeypatch):
     assert items_by_label["Move pane right"].connections == [
         ("activate", callbacks.on_move_pane_right)
     ]
+
+
+def test_tab_context_menu_contains_user_shell_new_tab(monkeypatch):
+    import guake.menus as menus
+
+    fake_gtk = SimpleNamespace(
+        Menu=FakeMenu,
+        MenuItem=FakeMenuItem,
+    )
+    monkeypatch.setattr(menus, "Gtk", fake_gtk)
+
+    callbacks = FakeCallbacks()
+    menu = mk_tab_context_menu(callbacks)
+    items_by_label = {
+        item.label: item
+        for item in menu.items
+        if isinstance(item, FakeMenuItem)
+    }
+
+    assert items_by_label["New Tab with User Shell"].connections == [
+        ("activate", callbacks.on_new_tab_with_user_shell)
+    ]
+
+
+def test_notebook_context_menu_contains_user_shell_new_tab(monkeypatch):
+    import guake.menus as menus
+
+    fake_gtk = SimpleNamespace(
+        Menu=FakeMenu,
+        MenuItem=FakeMenuItem,
+        ImageMenuItem=FakeMenuItem,
+        SeparatorMenuItem=FakeSeparatorMenuItem,
+    )
+    monkeypatch.setattr(menus, "Gtk", fake_gtk)
+
+    callbacks = FakeCallbacks()
+    menu = mk_notebook_context_menu(callbacks)
+    items_by_label = {
+        item.label: item
+        for item in menu.items
+        if isinstance(item, FakeMenuItem)
+    }
+
+    assert items_by_label["New Tab with User Shell"].connections == [
+        ("activate", callbacks.on_new_tab_with_user_shell)
+    ]
+
+
+def test_tab_context_user_shell_new_tab_callback():
+    general_settings = SimpleNamespace(get_boolean=lambda key: False)
+    guake = SimpleNamespace(settings=SimpleNamespace(general=general_settings))
+    notebook = SimpleNamespace(guake=guake, new_page_with_focus=MagicMock())
+    tab_label = SimpleNamespace(notebook=notebook)
+
+    TabLabelEventBox.on_new_tab_with_user_shell(tab_label, None)
+
+    notebook.new_page_with_focus.assert_called_once_with(use_user_shell=True)
 
 
 def test_terminal_context_callbacks_move_pane(monkeypatch):

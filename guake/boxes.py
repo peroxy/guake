@@ -73,10 +73,11 @@ class TerminalHolder:
 
 
 class RootTerminalBox(Gtk.Overlay, TerminalHolder):
-    def __init__(self, guake, parent_notebook):
+    def __init__(self, guake, parent_notebook, use_user_shell=False):
         super().__init__()
         self.guake = guake
         self.notebook = parent_notebook
+        self.use_user_shell = use_user_shell
         self.child = None
         self.last_terminal_focused = None
 
@@ -304,7 +305,9 @@ class RootTerminalBox(Gtk.Overlay, TerminalHolder):
                 box.unset_terminal()
 
             # Replace term in the TerminalBox
-            term = self.get_notebook().terminal_spawn(cur["directory"])
+            term = self.get_notebook().terminal_spawn(
+                cur["directory"], use_user_shell=self.use_user_shell
+            )
             term.set_custom_colors_from_dict(cur.get("custom_colors", None))
             box.set_terminal(term)
             self.get_notebook().terminal_attached(term)
@@ -510,6 +513,7 @@ class TerminalBox(Gtk.Box, TerminalHolder):
     def split_no_save(self, orientation, split_percentage: int = 50):
         notebook = self.get_notebook()
         parent = self.get_parent()  # RootTerminalBox
+        use_user_shell = getattr(self.get_root_box(), "use_user_shell", False)
 
         if orientation == DualTerminalBox.ORIENT_H:
             position = self.get_allocation().width * ((100 - split_percentage) / 100)
@@ -517,7 +521,7 @@ class TerminalBox(Gtk.Box, TerminalHolder):
             position = self.get_allocation().height * ((100 - split_percentage) / 100)
 
         terminal_box = TerminalBox()
-        terminal = notebook.terminal_spawn()
+        terminal = notebook.terminal_spawn(use_user_shell=use_user_shell)
         terminal_box.set_terminal(terminal)
         dual_terminal_box = DualTerminalBox(orientation)
         dual_terminal_box.set_position(position)
@@ -798,6 +802,10 @@ class TabLabelEventBox(Gtk.EventBox):
     @save_tabs_when_changed
     def on_new_tab(self, user_data):
         self.notebook.new_page_with_focus()
+
+    @save_tabs_when_changed
+    def on_new_tab_with_user_shell(self, user_data):
+        self.notebook.new_page_with_focus(use_user_shell=True)
 
     @save_tabs_when_changed
     def on_rename(self, user_data):
