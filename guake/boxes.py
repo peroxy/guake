@@ -432,6 +432,12 @@ class TerminalBox(Gtk.Box, TerminalHolder):
             self.terminal.connect("button-press-event", self.on_button_press, None)
         )
         self.terminal.handler_ids.append(
+            self.terminal.connect("button-release-event", self.on_button_release, None)
+        )
+        self.terminal.handler_ids.append(
+            self.terminal.connect("motion-notify-event", self.on_motion_notify, None)
+        )
+        self.terminal.handler_ids.append(
             self.terminal.connect("child-exited", self.on_terminal_exited)
         )
         self.pack_start(self.terminal, True, True, 0)
@@ -554,7 +560,35 @@ class TerminalBox(Gtk.Box, TerminalHolder):
             return
         self.get_parent().remove_dead_child(self)
 
+    @staticmethod
+    def _get_event_state(event):
+        state = event.get_state()
+        if hasattr(state, "state"):
+            return state.state
+        return state
+
+    @staticmethod
+    def _reverse_terminal_mouse_selection_modifier(event):
+        state = TerminalBox._get_event_state(event)
+        if state & Gdk.ModifierType.SHIFT_MASK:
+            event.state = state & ~Gdk.ModifierType.SHIFT_MASK
+        else:
+            event.state = state | Gdk.ModifierType.SHIFT_MASK
+
+    def on_button_release(self, target, event, user_data):
+        if event.button == 1:
+            self._reverse_terminal_mouse_selection_modifier(event)
+        return False
+
+    def on_motion_notify(self, target, event, user_data):
+        if self._get_event_state(event) & Gdk.ModifierType.BUTTON1_MASK:
+            self._reverse_terminal_mouse_selection_modifier(event)
+        return False
+
     def on_button_press(self, target, event, user_data):
+        if event.button == 1:
+            self._reverse_terminal_mouse_selection_modifier(event)
+
         if event.button == 3:
             # First send to background process if handled, do nothing else
             if (
