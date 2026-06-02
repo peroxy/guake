@@ -558,7 +558,7 @@ class TerminalBox(Gtk.Box, TerminalHolder):
         if event.button == 3:
             # First send to background process if handled, do nothing else
             if (
-                not event.get_state() & Gdk.ModifierType.SHIFT_MASK
+                event.get_state() & Gdk.ModifierType.SHIFT_MASK
                 and Vte.Terminal.do_button_press_event(self.terminal, event)
             ):
                 return True
