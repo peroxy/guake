@@ -87,6 +87,21 @@ __all__ = ["GuakeTerminal"]
 
 # pylint: enable=anomalous-backslash-in-string
 
+BACKWARD_WORD_DELETE_CONTROL_KEYVALS = {8, 127}
+FORWARD_WORD_DELETE_KEYVALS = {Gdk.KEY_Delete, Gdk.KEY_KP_Delete}
+WORD_DELETE_IGNORED_MODIFIERS = (
+    Gdk.ModifierType.LOCK_MASK | Gdk.ModifierType.MOD2_MASK | Gdk.ModifierType.MOD5_MASK
+)
+WORD_DELETE_DISALLOWED_MODIFIERS = (
+    Gdk.ModifierType.SHIFT_MASK
+    | Gdk.ModifierType.MOD1_MASK
+    | Gdk.ModifierType.MOD3_MASK
+    | Gdk.ModifierType.MOD4_MASK
+    | Gdk.ModifierType.SUPER_MASK
+    | Gdk.ModifierType.HYPER_MASK
+    | Gdk.ModifierType.META_MASK
+)
+
 
 def build_shell_argv(general_settings, use_user_shell=False):
     argv = []
@@ -123,6 +138,7 @@ class GuakeTerminal(Vte.Terminal):
             self.add_matches()
 
         self.handler_ids = []
+        self.handler_ids.append(self.connect("key-press-event", self.key_press))
         self.handler_ids.append(self.connect("button-press-event", self.button_press))
         self.connect("child-exited", self.on_child_exited)  # Call on_child_exited, don't remove it
         self.connect("selection-changed", self.copy_on_select)
@@ -150,6 +166,63 @@ class GuakeTerminal(Vte.Terminal):
         self.drag_dest_set(Gtk.DestDefaults.ALL, [], Gdk.DragAction.COPY)
         self.drag_dest_set_target_list(self.targets)
         self.connect("drag-data-received", self.on_drag_data_received)
+
+    @staticmethod
+    def _get_event_state(event):
+        if hasattr(event, "get_state"):
+            state = event.get_state()
+        else:
+            state = event.state
+        if hasattr(state, "state"):
+            return state.state
+        return state
+
+    @staticmethod
+    def _get_word_delete_sequence(event):
+        state = GuakeTerminal._get_event_state(event)
+        modifiers = state & ~WORD_DELETE_IGNORED_MODIFIERS
+        if modifiers & WORD_DELETE_DISALLOWED_MODIFIERS:
+            return None
+        has_control = modifiers & Gdk.ModifierType.CONTROL_MASK
+        if event.keyval == Gdk.KEY_BackSpace and has_control:
+            return "\x17"
+        if event.keyval in BACKWARD_WORD_DELETE_CONTROL_KEYVALS:
+            if GuakeTerminal._get_hardware_keyval(event) == Gdk.KEY_BackSpace:
+                return "\x17"
+            return None
+        if not has_control:
+            return None
+        if event.keyval in FORWARD_WORD_DELETE_KEYVALS:
+            return "\x1bd"
+        return None
+
+    @staticmethod
+    def _get_hardware_keyval(event):
+        hardware_keycode = getattr(event, "hardware_keycode", None)
+        if hardware_keycode is None:
+            return None
+        display = Gdk.Display.get_default()
+        if display is None:
+            return None
+        keymap = Gdk.Keymap.get_for_display(display)
+        try:
+            translated = keymap.translate_keyboard_state(
+                hardware_keycode,
+                Gdk.ModifierType(0),
+                getattr(event, "group", 0),
+            )
+        except (AttributeError, TypeError, ValueError):
+            return None
+        if not translated[0]:
+            return None
+        return translated[1]
+
+    def key_press(self, _terminal, event):
+        sequence = GuakeTerminal._get_word_delete_sequence(event)
+        if not sequence:
+            return False
+        self.feed_child(sequence)
+        return True
 
     def get_uuid(self):
         return self.uuid

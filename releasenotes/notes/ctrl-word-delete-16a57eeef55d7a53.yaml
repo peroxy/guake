@@ -1,0 +1,4 @@
+features:
+  - |
+    - Add Ctrl+Backspace and Ctrl+Delete support for deleting words in the terminal.
+      Word boundary behavior depends on the active shell or terminal application.
