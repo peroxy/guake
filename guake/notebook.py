@@ -41,6 +41,7 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Wnck", "3.0")
 from gi.repository import GObject
 from gi.repository import Gdk
+from gi.repository import GLib
 from gi.repository import Gtk
 from gi.repository import Wnck
 from guake.terminal import GuakeTerminal
@@ -111,11 +112,53 @@ class TerminalNotebook(Gtk.Notebook):
         self.popover_window = None
         self.tab_selection_button.connect("clicked", self.on_tab_selection)
 
+        self.tabbar_alignment_update_id = None
+
         self.action_box = Gtk.Box(visible=True)
         self.action_box.pack_start(self.pin_button, 0, 0, 0)
         self.action_box.pack_start(self.new_page_button, 0, 0, 0)
         self.action_box.pack_start(self.tab_selection_button, 0, 0, 0)
+        self.configure_centered_tabbar()
+
+    def configure_centered_tabbar(self):
+        self.tabbar_start_spacer = Gtk.Box(visible=True)
+        self.set_action_widget(self.tabbar_start_spacer, Gtk.PackType.START)
         self.set_action_widget(self.action_box, Gtk.PackType.END)
+        self.connect("size-allocate", self.schedule_tabbar_alignment_update)
+        self.action_box.connect("size-allocate", self.schedule_tabbar_alignment_update)
+
+    def schedule_tabbar_alignment_update(self, *args):
+        if self.tabbar_alignment_update_id is None:
+            self.tabbar_alignment_update_id = GLib.idle_add(self.update_tabbar_alignment)
+
+    def update_tabbar_alignment(self):
+        self.tabbar_alignment_update_id = None
+
+        tabs = list(self.iter_tabs())
+        if not tabs:
+            return False
+
+        first_tab = tabs[0]
+        first_tab.set_margin_start(0)
+        self.tabbar_start_spacer.set_size_request(0, -1)
+
+        tab_width = 0
+        for tab in tabs:
+            _minimum_width, natural_width = tab.get_preferred_width()
+            tab_width += natural_width
+
+        notebook_width = self.get_allocated_width()
+        action_width = self.action_box.get_allocated_width()
+        available_tab_width = notebook_width - action_width
+        if notebook_width <= 0 or tab_width <= 0 or available_tab_width <= tab_width:
+            return False
+
+        centered_margin = (notebook_width - tab_width) // 2
+        available_margin = available_tab_width - tab_width
+        tabbar_margin = max(0, min(centered_margin, available_margin))
+        self.tabbar_start_spacer.set_size_request(tabbar_margin, -1)
+
+        return False
 
     def attach_guake(self, guake):
         self.guake = guake
@@ -359,6 +402,7 @@ class TerminalNotebook(Gtk.Notebook):
 
         self.hide_tabbar_if_one_tab()
         self.emit("page-deleted")
+        self.schedule_tabbar_alignment_update()
 
     def delete_page_by_label(self, label, kill=True, prompt=0):
         self.delete_page(self.find_tab_index_by_label(label), kill, prompt)
@@ -405,6 +449,7 @@ class TerminalNotebook(Gtk.Notebook):
         if self.guake:
             # Attack background image draw callback to root terminal box
             root_terminal_box.connect_after("draw", self.guake.background_image_manager.draw)
+        self.schedule_tabbar_alignment_update()
         return root_terminal_box, page_num, terminal
 
     def hide_tabbar_if_one_tab(self):
@@ -490,6 +535,7 @@ class TerminalNotebook(Gtk.Notebook):
                 self.set_tab_label(page, label)
             if user_set:
                 setattr(page, "custom_label_set", new_text != "-")
+            self.schedule_tabbar_alignment_update()
 
     def find_tab_index_by_label(self, eventbox):
         for index, tab_eventbox in enumerate(self.iter_tabs()):
