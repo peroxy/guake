@@ -138,10 +138,6 @@ class TerminalNotebook(Gtk.Notebook):
         if not tabs:
             return False
 
-        first_tab = tabs[0]
-        first_tab.set_margin_start(0)
-        self.tabbar_start_spacer.set_size_request(0, -1)
-
         tab_width = 0
         for tab in tabs:
             _minimum_width, natural_width = tab.get_preferred_width()
@@ -150,13 +146,15 @@ class TerminalNotebook(Gtk.Notebook):
         notebook_width = self.get_allocated_width()
         action_width = self.action_box.get_allocated_width()
         available_tab_width = notebook_width - action_width
-        if notebook_width <= 0 or tab_width <= 0 or available_tab_width <= tab_width:
-            return False
+        tabbar_margin = 0
+        if notebook_width > 0 and tab_width > 0 and available_tab_width > tab_width:
+            centered_margin = (notebook_width - tab_width) // 2
+            available_margin = available_tab_width - tab_width
+            tabbar_margin = max(0, min(centered_margin, available_margin))
 
-        centered_margin = (notebook_width - tab_width) // 2
-        available_margin = available_tab_width - tab_width
-        tabbar_margin = max(0, min(centered_margin, available_margin))
-        self.tabbar_start_spacer.set_size_request(tabbar_margin, -1)
+        current_margin, _height = self.tabbar_start_spacer.get_size_request()
+        if current_margin != tabbar_margin:
+            self.tabbar_start_spacer.set_size_request(tabbar_margin, -1)
 
         return False
 
