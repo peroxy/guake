@@ -114,6 +114,19 @@ class TerminalContextMenuCallbacks:
 
         PaneMover(self.window).move_right(self.terminal)
 
+    def get_swap_pane_tabs(self):
+        source_page = self.notebook.find_page_index_by_terminal(self.terminal)
+        return [
+            (page_num, self.notebook.get_tab_text_page(page))
+            for page_num, page in enumerate(self.notebook.iter_pages())
+            if page_num != source_page
+        ]
+
+    def on_swap_pane_with_tab(self, menu_item, page_num):
+        from guake.split_utils import TabPaneMover
+
+        TabPaneMover(self.notebook).move_to_tab(self.terminal, page_num)
+
     def on_close_terminal(self, *args):
         self.terminal.kill()
 

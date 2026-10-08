@@ -27,8 +27,8 @@ class FakeMenuItem:
         self.connections = []
         self.sensitive = True
 
-    def connect(self, signal, callback):
-        self.connections.append((signal, callback))
+    def connect(self, signal, callback, *args):
+        self.connections.append((signal, callback, *args))
 
     def set_label(self, label):
         self.label = label
@@ -57,6 +57,11 @@ class FakeClipboard:
 
 
 class FakeCallbacks:
+    swap_pane_tabs = []
+
+    def get_swap_pane_tabs(self):
+        return self.swap_pane_tabs
+
     def __getattr__(self, name):
         def callback(*args):
             return None
@@ -219,3 +224,69 @@ def test_terminal_context_callbacks_move_pane(monkeypatch):
         ("init", window),
         ("right", terminal),
     ]
+
+
+def make_terminal_menu(monkeypatch, callbacks):
+    import guake.menus as menus
+
+    fake_gtk = SimpleNamespace(
+        Menu=FakeMenu,
+        MenuItem=FakeMenuItem,
+        ImageMenuItem=FakeMenuItem,
+        SeparatorMenuItem=FakeSeparatorMenuItem,
+        Clipboard=FakeClipboard,
+    )
+    monkeypatch.setattr(menus, "Gtk", fake_gtk)
+    monkeypatch.setattr(menus, "CustomCommands", FakeCustomCommands)
+    menu = mk_terminal_context_menu(
+        FakeTerminal(),
+        SimpleNamespace(get_display=lambda: object()),
+        SimpleNamespace(general=SimpleNamespace(get_string=lambda key: None)),
+        callbacks,
+    )
+    return {item.label: item for item in menu.items if isinstance(item, FakeMenuItem)}
+
+
+def test_terminal_context_menu_lists_other_tabs_for_pane_swap(monkeypatch):
+    callbacks = FakeCallbacks()
+    callbacks.swap_pane_tabs = [(0, "first"), (2, "third")]
+
+    items_by_label = make_terminal_menu(monkeypatch, callbacks)
+
+    submenu_items = items_by_label["Swap pane with tab"].submenu.items
+    assert [item.label for item in submenu_items] == ["1. first", "3. third"]
+    assert submenu_items[1].connections == [("activate", callbacks.on_swap_pane_with_tab, 2)]
+
+
+def test_terminal_context_menu_hides_pane_swap_without_other_tabs(monkeypatch):
+    items_by_label = make_terminal_menu(monkeypatch, FakeCallbacks())
+
+    assert "Swap pane with tab" not in items_by_label
+
+
+def test_terminal_context_callbacks_swap_pane_with_tab(monkeypatch):
+    from guake import split_utils
+
+    calls = []
+    terminal = object()
+    pages = [object(), object(), object()]
+    notebook = SimpleNamespace(
+        find_page_index_by_terminal=lambda term: 1,
+        iter_pages=lambda: iter(pages),
+        get_tab_text_page=lambda page: f"tab{pages.index(page)}",
+    )
+
+    class FakeTabPaneMover:
+        def __init__(self, mover_notebook):
+            calls.append(("init", mover_notebook))
+
+        def move_to_tab(self, mover_terminal, page_num):
+            calls.append(("move", mover_terminal, page_num))
+
+    monkeypatch.setattr(split_utils, "TabPaneMover", FakeTabPaneMover)
+
+    callbacks = TerminalContextMenuCallbacks(terminal, object(), object(), notebook)
+
+    assert callbacks.get_swap_pane_tabs() == [(0, "tab0"), (2, "tab2")]
+    callbacks.on_swap_pane_with_tab(None, 2)
+    assert calls == [("init", notebook), ("move", terminal, 2)]

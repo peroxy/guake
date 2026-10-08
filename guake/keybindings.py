@@ -33,6 +33,7 @@ from guake.common import pixmapfile
 from guake.split_utils import FocusMover
 from guake.split_utils import PaneMover
 from guake.split_utils import SplitMover
+from guake.split_utils import TabPaneMover
 
 log = logging.getLogger(__name__)
 
@@ -190,6 +191,24 @@ class Keybindings:
                 "move-terminal-pane-right",
                 (
                     lambda *args: PaneMover(self.guake.window).move_right(
+                        self.guake.get_notebook().get_current_terminal()
+                    )
+                    or True
+                ),
+            ),
+            (
+                "swap-terminal-pane-next-tab",
+                (
+                    lambda *args: TabPaneMover(self.guake.get_notebook()).move_to_next_tab(
+                        self.guake.get_notebook().get_current_terminal()
+                    )
+                    or True
+                ),
+            ),
+            (
+                "swap-terminal-pane-prev-tab",
+                (
+                    lambda *args: TabPaneMover(self.guake.get_notebook()).move_to_prev_tab(
                         self.guake.get_notebook().get_current_terminal()
                     )
                     or True

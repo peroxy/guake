@@ -126,6 +126,14 @@ HOTKEYS = [
             {"key": "move-terminal-pane-left", "label": _("Move terminal pane left")},
             {"key": "move-terminal-pane-right", "label": _("Move terminal pane right")},
             {
+                "key": "swap-terminal-pane-next-tab",
+                "label": _("Swap terminal pane with next tab"),
+            },
+            {
+                "key": "swap-terminal-pane-prev-tab",
+                "label": _("Swap terminal pane with previous tab"),
+            },
+            {
                 "key": "move-terminal-split-up",
                 "label": _("Move the terminal split handle up"),
             },

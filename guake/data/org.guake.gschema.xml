@@ -653,6 +653,16 @@
             <summary>Move terminal pane right.</summary>
             <description>Move terminal pane right.</description>
         </key>
+        <key name="swap-terminal-pane-next-tab" type="s">
+            <default>''</default>
+            <summary>Swap terminal pane with next tab.</summary>
+            <description>Swap the terminal pane with the pane at the same position in the next tab.</description>
+        </key>
+        <key name="swap-terminal-pane-prev-tab" type="s">
+            <default>''</default>
+            <summary>Swap terminal pane with previous tab.</summary>
+            <description>Swap the terminal pane with the pane at the same position in the previous tab.</description>
+        </key>
         <key name="move-terminal-split-up" type="s">
             <default>''</default>
             <summary>Move the terminal split handle up.</summary>

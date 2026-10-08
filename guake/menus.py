@@ -116,6 +116,16 @@ def mk_terminal_context_menu(terminal, window, settings, callback_object):
     mi = Gtk.MenuItem(_("Move pane right"))
     mi.connect("activate", callback_object.on_move_pane_right)
     menu.add(mi)
+    swap_tabs = callback_object.get_swap_pane_tabs()
+    if swap_tabs:
+        mi = Gtk.MenuItem(_("Swap pane with tab"))
+        submenu = Gtk.Menu()
+        for page_num, tab_name in swap_tabs:
+            tab_item = Gtk.MenuItem(f"{page_num + 1}. {tab_name}")
+            tab_item.connect("activate", callback_object.on_swap_pane_with_tab, page_num)
+            submenu.add(tab_item)
+        mi.set_submenu(submenu)
+        menu.add(mi)
     menu.add(Gtk.SeparatorMenuItem())
     mi = Gtk.MenuItem(_("Close terminal"))
     mi.connect("activate", callback_object.on_close_terminal)

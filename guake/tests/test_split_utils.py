@@ -3,9 +3,19 @@
 import xml.etree.ElementTree as ET
 
 from types import SimpleNamespace
+from unittest.mock import MagicMock
 
+import gi
+
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk
+
+from guake.boxes import DualTerminalBox
+from guake.boxes import RootTerminalBox
+from guake.boxes import TerminalHolder
 from guake.prefs import HOTKEYS
 from guake.split_utils import PaneMover
+from guake.split_utils import TabPaneMover
 
 
 PANE_MOVE_KEYS = {
@@ -13,6 +23,8 @@ PANE_MOVE_KEYS = {
     "move-terminal-pane-down",
     "move-terminal-pane-left",
     "move-terminal-pane-right",
+    "swap-terminal-pane-next-tab",
+    "swap-terminal-pane-prev-tab",
 }
 
 
@@ -282,3 +294,134 @@ def test_pane_move_hotkeys_are_in_schema_and_preferences():
     for key in PANE_MOVE_KEYS:
         assert schema_keys[key] == "''"
         assert key in prefs_keys
+
+
+class TabNotebook(Gtk.Notebook):
+    def __init__(self):
+        super().__init__()
+        self.guake = MagicMock()
+        self.last_terminal_focused = None
+
+    def set_last_terminal_focused(self, terminal):
+        self.last_terminal_focused = terminal
+
+
+class TabPaneTerminal:
+    def __init__(self, name):
+        self.name = name
+        self.box = None
+        self.focus_count = 0
+
+    def get_parent(self):
+        return self.box
+
+    def grab_focus(self):
+        self.focus_count += 1
+
+
+class TabPane(Gtk.DrawingArea, TerminalHolder):
+    def __init__(self, name):
+        super().__init__()
+        self.terminal = TabPaneTerminal(name)
+        self.terminal.box = self
+
+    def get_terminal(self):
+        return self.terminal
+
+    def get_root_box(self):
+        return self.get_parent().get_root_box()
+
+    def get_guake(self):
+        return None
+
+
+def split(orientation, first, second):
+    box = DualTerminalBox(orientation)
+    box.set_child_first(first)
+    box.set_child_second(second)
+    return box
+
+
+def add_tab(notebook, layout):
+    root = RootTerminalBox(None, notebook)
+    root.set_child(layout)
+    root.show_all()
+    notebook.append_page(root, None)
+    return root
+
+
+def add_quad_tab(notebook, prefix):
+    panes = [TabPane(f"{prefix}{index}") for index in range(4)]
+    add_tab(
+        notebook,
+        split(
+            DualTerminalBox.ORIENT_H,
+            split(DualTerminalBox.ORIENT_V, panes[0], panes[1]),
+            split(DualTerminalBox.ORIENT_V, panes[2], panes[3]),
+        ),
+    )
+    return panes
+
+
+def make_tab_notebook():
+    notebook = TabNotebook()
+    window = Gtk.OffscreenWindow()
+    window.add(notebook)
+    window.show_all()
+    return notebook
+
+
+def test_swap_pane_with_matching_pane_in_other_tab():
+    notebook = make_tab_notebook()
+    first = add_quad_tab(notebook, "a")
+    second = add_quad_tab(notebook, "b")
+    moved = first[2].get_terminal()
+    replaced = second[2].get_terminal()
+
+    assert TabPaneMover(notebook).move_to_tab(moved, 1)
+
+    assert notebook.get_nth_page(0).find_box_by_path([2, 1]) is second[2]
+    assert notebook.get_nth_page(1).find_box_by_path([2, 1]) is first[2]
+    assert notebook.get_current_page() == 1
+    assert moved.focus_count == 1
+    assert notebook.get_nth_page(0).last_terminal_focused is replaced
+    assert notebook.get_nth_page(1).last_terminal_focused is moved
+    assert notebook.last_terminal_focused is moved
+    notebook.guake.on_terminal_title_changed.assert_any_call(replaced, replaced)
+    notebook.guake.on_terminal_title_changed.assert_called_with(moved, moved)
+
+
+def test_swap_pane_falls_back_when_layouts_differ():
+    notebook = make_tab_notebook()
+    first = add_quad_tab(notebook, "a")
+    single = TabPane("single")
+    add_tab(notebook, single)
+
+    assert TabPaneMover(notebook).move_to_tab(first[3].get_terminal(), 1)
+
+    assert notebook.get_nth_page(0).find_box_by_path([2, 2]) is single
+    assert notebook.get_nth_page(1).get_child() is first[3]
+
+
+def test_swap_pane_with_next_and_prev_tab_wraps():
+    notebook = make_tab_notebook()
+    first = add_quad_tab(notebook, "a")
+    add_quad_tab(notebook, "b")
+    third = add_quad_tab(notebook, "c")
+    mover = TabPaneMover(notebook)
+
+    assert mover.move_to_prev_tab(first[0].get_terminal())
+    assert notebook.get_nth_page(2).find_box_by_path([1, 1]) is first[0]
+    assert notebook.get_current_page() == 2
+
+    assert mover.move_to_next_tab(first[0].get_terminal())
+    assert notebook.get_nth_page(0).find_box_by_path([1, 1]) is first[0]
+    assert notebook.get_nth_page(2).find_box_by_path([1, 1]) is third[0]
+
+
+def test_swap_pane_noops_with_single_tab():
+    notebook = make_tab_notebook()
+    first = add_quad_tab(notebook, "a")
+
+    assert not TabPaneMover(notebook).move_to_next_tab(first[0].get_terminal())
+    assert notebook.get_nth_page(0).find_box_by_path([1, 1]) is first[0]

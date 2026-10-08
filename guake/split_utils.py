@@ -133,6 +133,54 @@ class PaneMover(FocusMover):
         return True
 
 
+class TabPaneMover:
+    """Swaps a terminal pane with the pane at the same layout position in another tab."""
+
+    def __init__(self, notebook):
+        self.notebook = notebook
+
+    def move_to_next_tab(self, terminal):
+        return self.move_by_offset(terminal, 1)
+
+    def move_to_prev_tab(self, terminal):
+        return self.move_by_offset(terminal, -1)
+
+    def move_by_offset(self, terminal, offset):
+        if terminal is None:
+            return False
+        page_num = self.notebook.page_num(terminal.get_parent().get_root_box())
+        n_pages = self.notebook.get_n_pages()
+        if page_num == -1 or n_pages < 2:
+            return False
+        return self.move_to_tab(terminal, (page_num + offset) % n_pages)
+
+    def move_to_tab(self, terminal, page_num):
+        if terminal is None:
+            return False
+        source_box = terminal.get_parent()
+        source_root = source_box.get_root_box()
+        target_root = self.notebook.get_nth_page(page_num)
+        if target_root is None or target_root is source_root:
+            return False
+
+        target_box = target_root.find_box_by_path(source_root.get_box_path(source_box))
+        if target_box is None:
+            return False
+        target_terminal = target_box.get_terminal()
+
+        swap_terminal_boxes(source_box, target_box)
+
+        source_root.last_terminal_focused = target_terminal
+        target_root.set_last_terminal_focused(terminal)
+        self.notebook.set_current_page(page_num)
+        terminal.grab_focus()
+
+        guake = self.notebook.guake
+        guake.on_terminal_title_changed(target_terminal, target_terminal)
+        guake.on_terminal_title_changed(terminal, terminal)
+        return True
+
+
 class SplitMover:
 
     THRESHOLD = 35

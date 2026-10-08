@@ -230,6 +230,26 @@ class RootTerminalBox(Gtk.Overlay, TerminalHolder):
     def get_root_box(self):
         return self
 
+    def get_box_path(self, box):
+        """Child positions leading from the root to `box`."""
+        path = []
+        while box is not self.child:
+            parent = box.get_parent()
+            path.insert(0, parent.get_child_position(box))
+            box = parent
+        return path
+
+    def find_box_by_path(self, path):
+        """Follow `path` as far as this layout allows and return the terminal box there."""
+        box = self.child
+        for position in path:
+            if not isinstance(box, DualTerminalBox):
+                break
+            box = box.get_child1() if position == 1 else box.get_child2()
+        while isinstance(box, DualTerminalBox):
+            box = box.get_child1()
+        return box
+
     def save_box_layout(self, box, panes: list):
         """Save box layout with pre-order traversal, it should result `panes` with
         a full binary tree in list.
