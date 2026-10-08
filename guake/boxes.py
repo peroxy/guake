@@ -607,13 +607,13 @@ class DualTerminalBox(Gtk.Paned, TerminalHolder):
 
     def set_child_first(self, terminal_holder):
         if isinstance(terminal_holder, TerminalHolder):
-            self.add1(terminal_holder)
+            self.pack1(terminal_holder, True, False)
         else:
             print("wtf, what have you added to me???")
 
     def set_child_second(self, terminal_holder):
         if isinstance(terminal_holder, TerminalHolder):
-            self.add2(terminal_holder)
+            self.pack2(terminal_holder, True, False)
         else:
             print("wtf, what have you added to me???")
 
@@ -642,7 +642,8 @@ class DualTerminalBox(Gtk.Paned, TerminalHolder):
         return position
 
     def attach_detached_child(self, position, child):
-        child.reparent(self)
+        child.get_parent().remove(child)
+        self._set_child_at_position(position, child)
 
     def _set_child_at_position(self, position, child):
         if position == 1:

@@ -209,7 +209,7 @@ class FullscreenManager:
 
         if not window_state & Gdk.WindowState.WITHDRAWN:
             if self.is_fullscreen():
-                self.fullscreen()
+                self.toggle_fullscreen_hide_tabbar()
             elif window_state & Gdk.WindowState.FOCUSED and self.guake.hidden:
                 self.unfullscreen()
 
